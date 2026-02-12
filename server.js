@@ -30,7 +30,13 @@ function parseCookies(req) {
   const raw = req.headers.cookie || '';
   return Object.fromEntries(raw.split(';').filter(Boolean).map((pair) => {
     const idx = pair.indexOf('=');
-    return [pair.slice(0, idx).trim(), decodeURIComponent(pair.slice(idx + 1))];
+    const key = (idx === -1 ? pair : pair.slice(0, idx)).trim();
+    const rawValue = idx === -1 ? '' : pair.slice(idx + 1);
+    try {
+      return [key, decodeURIComponent(rawValue)];
+    } catch {
+      return [key, rawValue];
+    }
   }));
 }
 function getSessionUser(req, store) {
@@ -156,7 +162,11 @@ const server = http.createServer(async (req, res) => {
     const { method, amount, reference } = await parseBody(req);
     if (!method || !amount || !reference) return redirect(res, '/payments?message=Please fill every payment field');
     if (!['bank', 'mobile_money'].includes(method)) return redirect(res, '/payments?message=Payment method not supported');
-    store.payments.push({ id: `p${Date.now()}`, userId: user.id, method, amount, reference, status: 'pending_verification', createdAt: new Date().toISOString() });
+    const normalizedAmount = Number(amount);
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      return redirect(res, '/payments?message=Amount must be a positive number');
+    }
+    store.payments.push({ id: `p${Date.now()}`, userId: user.id, method, amount: normalizedAmount.toFixed(2), reference, status: 'pending_verification', createdAt: new Date().toISOString() });
     writeStore(store);
     return redirect(res, '/payments?message=Payment submitted for verification');
   }
@@ -187,6 +197,10 @@ const server = http.createServer(async (req, res) => {
     const id = url.pathname.split('/')[3];
     const target = store.users.find((u) => u.id === id);
     if (!target) return redirect(res, '/admin?message=User not found');
+    const adminCount = store.users.filter((u) => u.role === 'admin').length;
+    if (target.role === 'admin' && adminCount <= 1) {
+      return redirect(res, '/admin?message=Cannot remove the last admin account');
+    }
     target.role = target.role === 'admin' ? 'user' : 'admin';
     writeStore(store);
     return redirect(res, '/admin?message=User role updated');
