@@ -59,8 +59,25 @@ function renderPage(title, body) {
 }
 function nav(user) {
   if (!user) return '';
-  const link = user.role === 'admin' ? '<a href="/admin">Admin Panel</a>' : '<a href="/dashboard">Dashboard</a>';
-  return `<nav>${link}<form action="/logout" method="post"><button>Logout</button></form></nav>`;
+  const links = user.role === 'admin'
+    ? '<a href="/admin">Admin Panel</a>'
+    : '<a href="/dashboard">Dashboard</a><a href="/payments">Payments</a>';
+  return `<nav>${links}<form action="/logout" method="post"><button>Logout</button></form></nav>`;
+}
+
+function renderPaymentsPage(user, store, message) {
+  const payments = store.payments
+    .filter((p) => p.userId === user.id)
+    .map((p) => `<li><strong>${escapeHtml(p.method)}</strong> - ${escapeHtml(p.amount)} | Ref: ${escapeHtml(p.reference)} (${escapeHtml(p.status)})</li>`)
+    .join('');
+
+  const body = `<header><h1>Payments</h1><p>Submit 420Shots payments via bank transfer or mobile money.</p><nav><a href="/dashboard">Dashboard</a><a href="/">Home</a><form action="/logout" method="post"><button>Logout</button></form></nav></header><main>
+      ${message ? `<p class="alert success">${message}</p>` : ''}
+      <section class="grid-two"><div class="card"><h2>New Payment</h2><form action="/payments" method="post"><label>Payment Method<select name="method" required><option value="">Choose method</option><option value="bank">Bank Transfer</option><option value="mobile_money">Mobile Money</option></select></label><label>Amount<input name="amount" type="number" min="1" required/></label><label>Reference / Transaction ID<input name="reference" required/></label><button>Submit Payment</button></form></div>
+      <div class="card"><h2>Payment History</h2>${payments ? `<ul>${payments}</ul>` : '<p>No payments submitted yet.</p>'}</div></section>
+      <section class="card"><h2>Payment Details</h2><p>${escapeHtml(store.site.description)}</p></section></main>`;
+
+  return renderPage('420Shots | Payments', body);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -119,25 +136,29 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/dashboard') {
     if (!user) return redirect(res, '/');
     const message = escapeHtml(url.searchParams.get('message') || '');
-    const payments = store.payments.filter((p) => p.userId === user.id).map((p) => `<li><strong>${escapeHtml(p.method)}</strong> - ${escapeHtml(p.amount)} (${escapeHtml(p.status)})</li>`).join('');
-    const imgs = store.site.images.map((img) => `<img src="${escapeHtml(img)}" alt="420Shots preview" />`).join('');
-    const body = `<header><h1>Welcome, ${escapeHtml(user.name)}</h1><nav><a href="/">Home</a><form action="/logout" method="post"><button>Logout</button></form></nav></header><main>
+    const body = `<header><h1>Welcome, ${escapeHtml(user.name)}</h1><nav><a href="/">Home</a><a href="/payments">Payments</a><form action="/logout" method="post"><button>Logout</button></form></nav></header><main>
       ${message ? `<p class="alert success">${message}</p>` : ''}
-      <section class="grid-two"><div class="card"><h2>Submit Payment for 420Shots</h2><form action="/payments" method="post"><label>Payment Method<select name="method" required><option value="">Choose method</option><option value="bank">Bank Transfer</option><option value="mobile_money">Mobile Money</option></select></label><label>Amount<input name="amount" type="number" min="1" required/></label><label>Reference / Transaction ID<input name="reference" required/></label><button>Submit Payment</button></form></div>
-      <div class="card"><h2>Your Payment History</h2>${payments ? `<ul>${payments}</ul>` : '<p>No payments submitted yet.</p>'}</div></section>
-      <section class="card"><h2>About 420Shots</h2><p>${escapeHtml(store.site.description)}</p><div class="image-grid">${imgs}</div></section></main>`;
+      <section class="card"><h2>User Dashboard</h2><p>Manage your account and submit payments on the Payments page.</p><a href="/payments"><button type="button">Go to Payments</button></a></section>
+      <section class="card"><h2>About 420Shots</h2><p>${escapeHtml(store.site.description)}</p></section></main>`;
     res.writeHead(200, { 'Content-Type': 'text/html' });
     return res.end(renderPage('420Shots | Dashboard', body));
+  }
+
+  if (req.method === 'GET' && url.pathname === '/payments') {
+    if (!user) return redirect(res, '/');
+    const message = escapeHtml(url.searchParams.get('message') || '');
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    return res.end(renderPaymentsPage(user, store, message));
   }
 
   if (req.method === 'POST' && url.pathname === '/payments') {
     if (!user) return redirect(res, '/');
     const { method, amount, reference } = await parseBody(req);
-    if (!method || !amount || !reference) return redirect(res, '/dashboard?message=Please fill every payment field');
-    if (!['bank', 'mobile_money'].includes(method)) return redirect(res, '/dashboard?message=Payment method not supported');
+    if (!method || !amount || !reference) return redirect(res, '/payments?message=Please fill every payment field');
+    if (!['bank', 'mobile_money'].includes(method)) return redirect(res, '/payments?message=Payment method not supported');
     store.payments.push({ id: `p${Date.now()}`, userId: user.id, method, amount, reference, status: 'pending_verification', createdAt: new Date().toISOString() });
     writeStore(store);
-    return redirect(res, '/dashboard?message=Payment submitted for verification');
+    return redirect(res, '/payments?message=Payment submitted for verification');
   }
 
   if (req.method === 'GET' && url.pathname === '/admin') {
