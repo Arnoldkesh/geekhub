@@ -1,0 +1,20 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "name": "Admin",
+      "email": "admin@420shots.com",
+      "passwordHash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+      "role": "admin",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "payments": [],
+  "site": {
+    "description": "Welcome to 420Shots. Pay securely through bank transfer or mobile money.",
+    "images": [
+      "https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
+    ]
+  }
+}

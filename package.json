@@ -1,0 +1,9 @@
+{
+  "name": "geekhub",
+  "version": "1.0.0",
+  "description": "User administration and payment website",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
